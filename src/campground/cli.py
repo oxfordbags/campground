@@ -1,7 +1,9 @@
 import argparse
 import os
 import pathlib
+import platform
 import shutil
+import subprocess
 import sys
 
 from . import api, config, download
@@ -79,6 +81,7 @@ campground — download albums from your Bandcamp library
 
 Usage:
   campground <url> [options]
+  campground config
 
 Options:
   -f, --format FORMAT      Audio format (default: flac)
@@ -115,9 +118,41 @@ Setup (one-time):
 """
 
 
+CONFIG_TEMPLATE = """\
+[bandcamp]
+cookies = ""
+
+[download]
+format = "flac"
+# output_dir = "~/Music/Bandcamp"
+"""
+
+
+def edit_config():
+    path = config.CONFIG_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text(CONFIG_TEMPLATE)
+        print(f"Created {path}")
+
+    editor = (
+        os.environ.get("EDITOR")
+        or os.environ.get("VISUAL")
+        or ("open" if platform.system() == "Darwin" else None)
+        or ("xdg-open" if platform.system() == "Linux" else None)
+        or "notepad"
+    )
+
+    subprocess.run([editor, str(path)])
+
+
 def main():
     if len(sys.argv) == 1:
         print(HELP.strip())
+        sys.exit(0)
+
+    if sys.argv[1] == "config":
+        edit_config()
         sys.exit(0)
 
     try:
