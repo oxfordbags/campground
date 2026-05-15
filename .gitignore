@@ -1,4 +1,6 @@
 creds.txt
-__pycache__/
+**/__pycache__/
 *.pyc
 .DS_Store
+*.egg-info/
+.claude/
