@@ -1,4 +1,5 @@
 import argparse
+import os
 import pathlib
 import sys
 
@@ -113,6 +114,14 @@ def main():
         print(HELP.strip())
         sys.exit(0)
 
+    try:
+        _run()
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        os._exit(130)
+
+
+def _run():
     args = build_parser().parse_args()
     cfg = config.merge(config.load(), args)
 
