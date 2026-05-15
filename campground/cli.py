@@ -1,6 +1,7 @@
 import argparse
 import os
 import pathlib
+import shutil
 import sys
 
 from . import api, config, download
@@ -38,6 +39,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--cookies-file", dest="cookies_file", metavar="FILE",
         help="Path to a file containing the cookie string",
+    )
+    p.add_argument(
+        "--overwrite", action="store_true",
+        help="Replace an existing download if it already exists in the output directory",
     )
     return p
 
@@ -82,6 +87,7 @@ Options:
   -o, --output DIR         Output directory (default: current directory)
   --cookies STRING         Cookie string from browser dev tools
   --cookies-file FILE      Path to a file containing the cookie string
+  --overwrite              Replace an existing download in the output directory
 
 Examples:
   campground https://artist.bandcamp.com/album/title
@@ -166,6 +172,14 @@ def _run():
 
     if cfg.output_dir_explicit:
         dest.mkdir(parents=True, exist_ok=True)
+
+    existing = dest / name
+    if existing.exists():
+        if not args.overwrite:
+            print(f"Already exists, skipping: {existing}")
+            print("Use --overwrite to replace it.")
+            sys.exit(0)
+        shutil.rmtree(existing) if existing.is_dir() else existing.unlink()
 
     print(f"Downloading {entry.get('size_mb', '')} to {dest}...")
 
