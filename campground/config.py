@@ -8,7 +8,6 @@ DEFAULT_FORMAT = "flac"
 
 @dataclass
 class Config:
-    username: str = ""
     cookies: str = ""
     cookies_file: str = ""
     format: str = DEFAULT_FORMAT
@@ -31,7 +30,6 @@ def load(path: pathlib.Path = CONFIG_PATH) -> Config:
     dl = data.get("download", {})
     raw_output = dl.get("output_dir")
     return Config(
-        username=bc.get("username", ""),
         cookies=bc.get("cookies", ""),
         cookies_file=bc.get("cookies_file", ""),
         format=dl.get("format", DEFAULT_FORMAT),
@@ -43,7 +41,6 @@ def load(path: pathlib.Path = CONFIG_PATH) -> Config:
 def merge(base: Config, args) -> Config:
     cli_output = getattr(args, "output", None)
     return Config(
-        username=getattr(args, "username", None) or base.username,
         cookies=getattr(args, "cookies", None) or base.cookies,
         cookies_file=getattr(args, "cookies_file", None) or base.cookies_file,
         format=getattr(args, "format", None) or base.format,
