@@ -10,3 +10,6 @@ dependencies = ["curl-cffi>=0.5"]
 
 [project.scripts]
 campground = "campground.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
