@@ -5,8 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "campground"
 version = "0.1.0"
+description = "Download albums from your Bandcamp library"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = ["curl-cffi>=0.5"]
+keywords = ["bandcamp", "music", "download"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+
+[project.urls]
+Homepage = "https://github.com/oxfordbags/campground"
+Repository = "https://github.com/oxfordbags/campground"
 
 [project.scripts]
 campground = "campground.cli:main"
