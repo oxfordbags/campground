@@ -10,7 +10,7 @@ A lightweight command-line tool for downloading albums from your Bandcamp librar
 ## Installation
 
 ```sh
-pip install git+https://github.com/yourusername/campground.git
+pip install git+https://github.com/oxfordbags/campground.git
 ```
 
 ## Setup
