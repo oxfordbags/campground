@@ -150,6 +150,9 @@ def _run():
     title = f"{item['band_name']} - {item['item_title']}"
     print(f"Found: {title}")
 
+    if not item.get("download_available"):
+        sys.exit("This item is not available to download (may be a pre-order or stream-only).")
+
     if not redownload_url:
         sys.exit("This item has no download URL.")
 

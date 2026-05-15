@@ -54,8 +54,19 @@ def _fetch(session: requests.Session, url: str, dest_dir: pathlib.Path, fallback
 
 
 def _unzip(zip_path: pathlib.Path, dest_dir: pathlib.Path, subdir_name: str) -> pathlib.Path:
-    with zipfile.ZipFile(zip_path) as zf:
+    try:
+        zf_handle = zipfile.ZipFile(zip_path)
+    except zipfile.BadZipFile:
+        raise RuntimeError("Downloaded file is corrupted (not a valid zip). Try again.")
+
+    with zf_handle as zf:
         names = zf.namelist()
+
+        for name in names:
+            parts = pathlib.Path(name).parts
+            if pathlib.Path(name).is_absolute() or ".." in parts:
+                raise RuntimeError(f"Refusing to extract unsafe path in zip: {name}")
+
         top_level = {n.split("/")[0] for n in names}
 
         if len(top_level) == 1 and not any(n == top_level.copy().pop() for n in names):

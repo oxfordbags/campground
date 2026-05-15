@@ -1,3 +1,4 @@
+import sys
 import tomllib
 import pathlib
 from dataclasses import dataclass, field
@@ -24,8 +25,11 @@ class Config:
 def load(path: pathlib.Path = CONFIG_PATH) -> Config:
     if not path.exists():
         return Config()
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        sys.exit(f"Invalid config file ({path}):\n{e}")
     bc = data.get("bandcamp", {})
     dl = data.get("download", {})
     raw_output = dl.get("output_dir")
