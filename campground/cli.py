@@ -60,12 +60,59 @@ def resolve_cookies(cfg: config.Config) -> dict:
     return parse_cookie_string(cookie_str)
 
 
+def safe_name(title: str) -> str:
+    return "".join(c if c.isalnum() or c in " -_." else "_" for c in title).strip()
+
+
 def safe_filename(title: str, fmt: str) -> str:
-    stem = "".join(c if c.isalnum() or c in " -_." else "_" for c in title)
-    return f"{stem.strip()}{FORMAT_EXT[fmt]}"
+    return f"{safe_name(title)}{FORMAT_EXT[fmt]}"
+
+
+HELP = """
+campground — download albums from your Bandcamp library
+
+Usage:
+  campground <url> [options]
+
+Options:
+  -f, --format FORMAT      Audio format (default: flac)
+                           Choices: mp3-v0, mp3-320, flac, aac-hi,
+                                    vorbis, alac, wav, aiff-lossless
+  -o, --output DIR         Output directory (default: current directory)
+  --cookies STRING         Cookie string from browser dev tools
+  --cookies-file FILE      Path to a file containing the cookie string
+
+Examples:
+  campground https://artist.bandcamp.com/album/title
+  campground https://artist.bandcamp.com/album/title --format mp3-320
+  campground https://artist.bandcamp.com/album/title --output ~/Downloads
+
+Setup (one-time):
+  campground uses your browser session cookies to authenticate.
+
+  1. Log in to bandcamp.com in your browser
+  2. Open Dev Tools (Cmd+Option+I) → Network tab
+  3. Refresh the page and click any bandcamp.com request
+  4. Copy the full value of the Cookie: request header
+
+  Then either pass it directly:
+    campground <url> --cookies "your_cookie_string"
+
+  Or save it to ~/.config/campground/config.toml:
+    [bandcamp]
+    cookies = "your_cookie_string"
+
+    [download]
+    format = "flac"
+    output_dir = "~/Music/Bandcamp"  # optional
+"""
 
 
 def main():
+    if len(sys.argv) == 1:
+        print(HELP.strip())
+        sys.exit(0)
+
     args = build_parser().parse_args()
     cfg = config.merge(config.load(), args)
 
@@ -105,12 +152,16 @@ def main():
     entry = downloads[fmt]
     print(f"  Size: {entry.get('size_mb', 'unknown')}")
 
-    filename = safe_filename(title, fmt)
+    name = safe_name(title)
     dest = cfg.output_dir
-    print(f"Downloading to {dest / filename}...")
+
+    if cfg.output_dir_explicit:
+        dest.mkdir(parents=True, exist_ok=True)
+
+    print(f"Downloading {entry.get('size_mb', '')} to {dest}...")
 
     try:
-        path = download.fetch(session, entry["url"], dest, filename)
+        path = download.fetch_and_extract(session, entry["url"], dest, safe_filename(title, fmt), name)
     except Exception as e:
         sys.exit(f"Download failed: {e}")
 
