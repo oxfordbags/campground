@@ -21,7 +21,8 @@ def _init_schema(con: sqlite3.Connection):
             item_url           TEXT    NOT NULL,
             download_available INTEGER NOT NULL DEFAULT 1,
             first_seen_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-            downloaded_at      TEXT
+            downloaded_at      TEXT,
+            year               TEXT
         )
     """)
     con.execute("CREATE INDEX IF NOT EXISTS idx_item_url ON items(item_url)")
@@ -30,6 +31,7 @@ def _init_schema(con: sqlite3.Connection):
     for col, definition in [
         ("first_seen_at", "TEXT NOT NULL DEFAULT (datetime('now'))"),
         ("downloaded_at",  "TEXT"),
+        ("year",           "TEXT"),
     ]:
         try:
             con.execute(f"ALTER TABLE items ADD COLUMN {col} {definition}")
@@ -104,6 +106,20 @@ def get_new_item_ids(con: sqlite3.Connection) -> set[int]:
         (last,),
     ).fetchall()
     return {row[0] for row in rows}
+
+
+def get_year(con: sqlite3.Connection, sale_item_id: int) -> str | None:
+    row = con.execute(
+        "SELECT year FROM items WHERE sale_item_id = ?", (sale_item_id,)
+    ).fetchone()
+    return row["year"] if row else None
+
+
+def store_year(con: sqlite3.Connection, sale_item_id: int, year: str):
+    con.execute(
+        "UPDATE items SET year = ? WHERE sale_item_id = ?", (year, sale_item_id)
+    )
+    con.commit()
 
 
 def mark_downloaded(con: sqlite3.Connection, sale_item_id: int):

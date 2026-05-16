@@ -7,11 +7,14 @@ CONFIG_PATH = pathlib.Path.home() / ".config" / "campground" / "config.toml"
 DEFAULT_FORMAT = "flac"
 
 
+DEFAULT_PATH_TEMPLATE = "{artist} - {album}"
+
 @dataclass
 class Config:
     cookies: str = ""
     cookies_file: str = ""
     format: str = DEFAULT_FORMAT
+    path_template: str = DEFAULT_PATH_TEMPLATE
     output_dir: pathlib.Path | None = None  # None resolves to cwd at runtime
     output_dir_explicit: bool = False       # True when set by config or CLI flag
 
@@ -37,6 +40,7 @@ def load(path: pathlib.Path = CONFIG_PATH) -> Config:
         cookies=bc.get("cookies", ""),
         cookies_file=bc.get("cookies_file", ""),
         format=dl.get("format", DEFAULT_FORMAT),
+        path_template=dl.get("path_template", DEFAULT_PATH_TEMPLATE),
         output_dir=raw_output,
         output_dir_explicit=raw_output is not None,
     )
@@ -48,6 +52,7 @@ def merge(base: Config, args) -> Config:
         cookies=getattr(args, "cookies", None) or base.cookies,
         cookies_file=getattr(args, "cookies_file", None) or base.cookies_file,
         format=getattr(args, "format", None) or base.format,
+        path_template=base.path_template,
         output_dir=cli_output or str(base.output_dir),
         output_dir_explicit=bool(cli_output) or base.output_dir_explicit,
     )

@@ -58,8 +58,12 @@ def normalise_url(url: str) -> str:
     return urlunparse(p._replace(scheme="https", query="", fragment="")).rstrip("/").lower()
 
 
-def get_download_urls(session: requests.Session, redownload_url: str) -> dict:
-    """Return the downloads dict from a signed redownload URL (format name → {url, size_mb, …})."""
+def get_download_urls(session: requests.Session, redownload_url: str) -> tuple[dict, str | None]:
+    """
+    Return (downloads, year) from a signed redownload URL.
+    downloads: format name → {url, size_mb, …}
+    year: four-digit string if found in the data-blob, else None
+    """
     resp = session.get(redownload_url, headers=HEADERS)
     resp.raise_for_status()
     blobs = re.findall(r'data-blob="([^"]{20,})"', resp.text)
@@ -69,4 +73,14 @@ def get_download_urls(session: requests.Session, redownload_url: str) -> dict:
     items = blob.get("digital_items", [])
     if not items:
         raise RuntimeError("No downloadable items on this page")
-    return items[0].get("downloads", {})
+    item = items[0]
+    return item.get("downloads", {}), _extract_year(item)
+
+
+def _extract_year(item: dict) -> str | None:
+    for field in ("package_release_date", "album_release_date", "release_date"):
+        val = item.get(field) or ""
+        m = re.search(r'\b(19|20)\d{2}\b', val)
+        if m:
+            return m.group(0)
+    return None

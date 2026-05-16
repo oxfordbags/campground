@@ -2,6 +2,7 @@ import argparse
 import os
 import pathlib
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -122,6 +123,22 @@ def safe_filename(title: str, fmt: str) -> str:
     return f"{safe_name(title)}{FORMAT_EXT[fmt]}"
 
 
+def apply_template(template: str, artist: str, album: str, year: str | None) -> pathlib.Path:
+    filled = template.format(
+        artist=safe_name(artist),
+        album=safe_name(album),
+        year=safe_name(year) if year else "",
+    )
+    # Strip leading/trailing separators from each component, drop empties.
+    # This cleans up dangling " - " left by a missing year.
+    parts = []
+    for p in pathlib.PurePosixPath(filled).parts:
+        cleaned = re.sub(r'^[\s\-_.]+|[\s\-_.]+$', '', p)
+        if cleaned:
+            parts.append(cleaned)
+    return pathlib.Path(*parts) if parts else pathlib.Path(safe_name(f"{artist} - {album}"))
+
+
 def _auth(cfg: config.Config):
     cookies = resolve_cookies(cfg)
     session = make_session(cookies)
@@ -146,33 +163,47 @@ def _do_sync(con, session, fan_id: int, full: bool = False) -> int:
 
 def _download_one(session, item: dict, redownload_url: str | None, cfg: config.Config, overwrite: bool, con) -> bool:
     """Download a single item. Returns True on success, False on skip or error."""
-    title = f"{item['band_name']} - {item['item_title']}"
-    name = safe_name(title)
+    artist = item["band_name"]
+    album = item["item_title"]
+    sid = item["sale_item_id"]
+    label = f"{artist} - {album}"
+
+    year = db.get_year(con, sid)
     dest = cfg.output_dir
 
     if cfg.output_dir_explicit:
         dest.mkdir(parents=True, exist_ok=True)
 
-    existing = dest / name
+    existing = dest / apply_template(cfg.path_template, artist, album, year)
     if existing.exists() and not overwrite:
-        print(f"  Skipping (already exists): {title}")
-        db.mark_downloaded(con, item["sale_item_id"])
+        print(f"  Skipping (already exists): {label}")
+        db.mark_downloaded(con, sid)
         return False
 
     if not redownload_url:
-        print(f"  Skipping (no download URL): {title}")
+        print(f"  Skipping (no download URL): {label}")
         return False
 
     fmt = cfg.format
     try:
-        downloads = api.get_download_urls(session, redownload_url)
+        downloads, year_from_blob = api.get_download_urls(session, redownload_url)
     except Exception as e:
-        print(f"  Failed to get download page for {title}: {e}")
+        print(f"  Failed to get download page for {label}: {e}")
         return False
+
+    # Cache year and recheck path if it changed
+    if year_from_blob and year_from_blob != year:
+        year = year_from_blob
+        db.store_year(con, sid, year)
+        existing = dest / apply_template(cfg.path_template, artist, album, year)
+        if existing.exists() and not overwrite:
+            print(f"  Skipping (already exists): {label}")
+            db.mark_downloaded(con, sid)
+            return False
 
     if fmt not in downloads:
         available = ", ".join(downloads.keys())
-        print(f"  Skipping (format '{fmt}' not available, got: {available}): {title}")
+        print(f"  Skipping (format '{fmt}' not available, got: {available}): {label}")
         return False
 
     entry = downloads[fmt]
@@ -180,13 +211,14 @@ def _download_one(session, item: dict, redownload_url: str | None, cfg: config.C
     if existing.exists():
         shutil.rmtree(existing) if existing.is_dir() else existing.unlink()
 
+    name = apply_template(cfg.path_template, artist, album, year)
     try:
-        path = download.fetch_and_extract(session, entry["url"], dest, safe_filename(title, fmt), name)
-        db.mark_downloaded(con, item["sale_item_id"])
+        path = download.fetch_and_extract(session, entry["url"], dest, safe_filename(label, fmt), str(name))
+        db.mark_downloaded(con, sid)
         print(f"  Saved: {path}")
         return True
     except Exception as e:
-        print(f"  Download failed for {title}: {e}")
+        print(f"  Download failed for {label}: {e}")
         return False
 
 
@@ -278,6 +310,7 @@ cookies = ""
 [download]
 format = "flac"
 # output_dir = "~/Music/Bandcamp"
+# path_template = "{artist}/{year} - {album}"  # default: "{artist} - {album}"
 """
 
 
@@ -436,9 +469,12 @@ def _run():
     fmt = cfg.format
     print(f"Fetching {fmt} download link...")
     try:
-        downloads = api.get_download_urls(session, redownload_url)
+        downloads, year = api.get_download_urls(session, redownload_url)
     except Exception as e:
         sys.exit(f"Could not fetch download page: {e}")
+
+    if year:
+        db.store_year(con, row["sale_item_id"], year)
 
     if fmt not in downloads:
         available = ", ".join(downloads.keys())
@@ -447,8 +483,9 @@ def _run():
     entry = downloads[fmt]
     print(f"  Size: {entry.get('size_mb', 'unknown')}")
 
-    title = f"{row['artist']} - {row['title']}"
-    name = safe_name(title)
+    artist, album = row["artist"], row["title"]
+    title = f"{artist} - {album}"
+    name = apply_template(cfg.path_template, artist, album, year)
     dest = cfg.output_dir
 
     if cfg.output_dir_explicit:
@@ -465,7 +502,7 @@ def _run():
     print(f"Downloading {entry.get('size_mb', '')} to {dest}...")
 
     try:
-        path = download.fetch_and_extract(session, entry["url"], dest, safe_filename(title, fmt), name)
+        path = download.fetch_and_extract(session, entry["url"], dest, safe_filename(title, fmt), str(name))
         db.mark_downloaded(con, row["sale_item_id"])
     except Exception as e:
         sys.exit(f"Download failed: {e}")
