@@ -88,10 +88,19 @@ def build_search_parser() -> argparse.ArgumentParser:
         description="Search your Bandcamp library by title or artist",
     )
     p.add_argument("query", nargs="+", help="Search terms")
+    p.add_argument(
+        "-f", "--format", choices=VALID_FORMATS, metavar="FORMAT",
+        help=f"Audio format ({', '.join(VALID_FORMATS)}). Default: flac",
+    )
+    p.add_argument("-o", "--output", metavar="DIR", help="Output directory")
     p.add_argument("--cookies", metavar="STRING", help="Cookie string from browser dev tools")
     p.add_argument(
         "--cookies-file", dest="cookies_file", metavar="FILE",
         help="Path to a file containing the cookie string",
+    )
+    p.add_argument(
+        "--overwrite", action="store_true",
+        help="Re-download items that already exist in the output directory",
     )
     return p
 
@@ -277,7 +286,7 @@ Options (download / download-all / download-new):
 Examples:
   campground https://artist.bandcamp.com/album/title
   campground https://artist.bandcamp.com/album/title --format mp3-320
-  campground search "sea power"
+  campground search "sea power"           # shows results, prompts to download
   campground download-all --output ~/Music/Bandcamp
   campground download-new --output ~/Music/Bandcamp
   campground sync
@@ -398,6 +407,34 @@ def _run_search():
         status = "" if row["download_available"] else " [not downloadable]"
         print(f"  {i}. {row['artist']} — {row['title']}{status}")
         print(f"     {row['item_url']}")
+
+    try:
+        answer = input("\nDownload which? (number or comma-separated, Enter to skip): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+
+    if not answer:
+        return
+
+    selected = []
+    for part in answer.split(","):
+        part = part.strip()
+        if not part.isdigit() or not (1 <= int(part) <= len(results)):
+            print(f"Invalid selection: '{part}'")
+            return
+        selected.append(results[int(part) - 1])
+
+    skipped = [r for r in selected if not r["download_available"]]
+    for r in skipped:
+        print(f"  Skipping (not downloadable): {r['artist']} — {r['title']}")
+
+    target_ids = {r["sale_item_id"] for r in selected if r["download_available"]}
+    if not target_ids:
+        return
+
+    done, failed = _batch_download(session, fan_id, target_ids, cfg, args.overwrite, con)
+    print(f"\nDone. {done} downloaded, {failed} failed or skipped.")
 
 
 def _run_bulk(new_only: bool):
