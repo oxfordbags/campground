@@ -33,10 +33,10 @@ def iter_collection(session: requests.Session, fan_id: int, page_size: int = 50)
 
 def find_item(session: requests.Session, fan_id: int, target_url: str):
     """Return (item, redownload_url) for the first collection item matching target_url."""
-    target = _normalise_url(target_url)
+    target = normalise_url(target_url)
     checked = 0
     for item, redownload_url in iter_collection(session, fan_id):
-        if _normalise_url(item.get("item_url", "")) == target:
+        if normalise_url(item.get("item_url", "")) == target:
             return item, redownload_url
         checked += 1
         if checked % 50 == 0:
@@ -44,7 +44,15 @@ def find_item(session: requests.Session, fan_id: int, target_url: str):
     return None, None
 
 
-def _normalise_url(url: str) -> str:
+def find_item_by_id(session: requests.Session, fan_id: int, sale_item_id: int):
+    """Return (item, redownload_url) for a known sale_item_id, stopping as soon as found."""
+    for item, redownload_url in iter_collection(session, fan_id):
+        if item["sale_item_id"] == sale_item_id:
+            return item, redownload_url
+    return None, None
+
+
+def normalise_url(url: str) -> str:
     """Normalise to https, strip query string and fragment, lowercase."""
     p = urlparse(url.strip())
     return urlunparse(p._replace(scheme="https", query="", fragment="")).rstrip("/").lower()
