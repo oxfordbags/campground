@@ -46,9 +46,13 @@ def find_item(session: requests.Session, fan_id: int, target_url: str):
 
 def find_item_by_id(session: requests.Session, fan_id: int, sale_item_id: int):
     """Return (item, redownload_url) for a known sale_item_id, stopping as soon as found."""
+    checked = 0
     for item, redownload_url in iter_collection(session, fan_id):
         if item["sale_item_id"] == sale_item_id:
             return item, redownload_url
+        checked += 1
+        if checked % 50 == 0:
+            print(f"  ({checked} items searched...)")
     return None, None
 
 

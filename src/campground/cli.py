@@ -425,16 +425,29 @@ def _run_search():
             return
         selected.append(results[int(part) - 1])
 
-    skipped = [r for r in selected if not r["download_available"]]
-    for r in skipped:
-        print(f"  Skipping (not downloadable): {r['artist']} — {r['title']}")
+    done = 0
+    failed = 0
+    for i, r in enumerate(selected, 1):
+        label = f"{r['artist']} — {r['title']}"
+        prefix = f"\n[{i}/{len(selected)}] " if len(selected) > 1 else "\n"
+        if not r["download_available"]:
+            print(f"{prefix}Skipping (not downloadable): {label}")
+            failed += 1
+            continue
+        print(f"{prefix}{label}")
+        print("  Fetching download link...")
+        item, redownload_url = api.find_item_by_id(session, fan_id, r["sale_item_id"])
+        if not item:
+            print("  Could not locate in collection — try 'campground sync'")
+            failed += 1
+            continue
+        if _download_one(session, item, redownload_url, cfg, args.overwrite, con):
+            done += 1
+        else:
+            failed += 1
 
-    target_ids = {r["sale_item_id"] for r in selected if r["download_available"]}
-    if not target_ids:
-        return
-
-    done, failed = _batch_download(session, fan_id, target_ids, cfg, args.overwrite, con)
-    print(f"\nDone. {done} downloaded, {failed} failed or skipped.")
+    if len(selected) > 1:
+        print(f"\nDone. {done} downloaded, {failed} failed or skipped.")
 
 
 def _run_bulk(new_only: bool):
