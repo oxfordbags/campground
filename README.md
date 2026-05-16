@@ -10,6 +10,12 @@ A lightweight command-line tool for downloading albums from your Bandcamp librar
 ## Installation
 
 ```sh
+pip install campground
+```
+
+Or install directly from source:
+
+```sh
 pip install git+https://github.com/oxfordbags/campground.git
 ```
 
@@ -49,6 +55,9 @@ campground <bandcamp-album-url> [options]
 **Examples:**
 
 ```sh
+# Search your library and optionally download a result
+campground search "artist or album name"
+
 # Download an album in the default format (flac)
 campground https://artist.bandcamp.com/album/album-title
 
